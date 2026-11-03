@@ -1,5 +1,6 @@
-import { buildUserMessage, FILLS_SCHEMA, parseFillsReply, SYSTEM_PROMPT, type PromptInput } from '@formhand/core';
+import type { PromptInput } from '@formhand/core';
 import { AiError, type AiReply } from './errors';
+import { fillTask, type AiTask } from './tasks';
 
 export interface OpenAiConfig {
   apiKey: string;
@@ -59,22 +60,27 @@ function statusError(status: number, message: string, config: OpenAiConfig): AiE
   return new AiError(`${host(config.baseUrl)} returned an error (${status}): ${message}`);
 }
 
+/** Asks any OpenAI-compatible server for fills. */
+export function askOpenAiCompatible(config: OpenAiConfig, input: PromptInput, signal?: AbortSignal, fetchImpl: Fetch = fetch): Promise<AiReply> {
+  return runOpenAiCompatible(config, fillTask(input), signal, fetchImpl);
+}
+
 /**
- * Asks any OpenAI-compatible server (OpenAI, Gemini, OpenRouter, Ollama, LM Studio...)
- * for fills. Requests a JSON-schema reply; servers that don't support that get the
+ * Runs a task on any OpenAI-compatible server (OpenAI, Gemini, OpenRouter, Ollama,
+ * LM Studio...). Requests a JSON-schema reply; servers that don't support that get the
  * same request without it, and the prompt alone asks for JSON.
  */
-export async function askOpenAiCompatible(config: OpenAiConfig, input: PromptInput, signal?: AbortSignal, fetchImpl: Fetch = fetch): Promise<AiReply> {
+export async function runOpenAiCompatible<T>(config: OpenAiConfig, task: AiTask<T>, signal?: AbortSignal, fetchImpl: Fetch = fetch): Promise<T> {
   const base = {
     model: config.model,
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: buildUserMessage(input) },
+      { role: 'system', content: task.system },
+      { role: 'user', content: task.user },
     ],
   };
   const withSchema = {
     ...base,
-    response_format: { type: 'json_schema', json_schema: { name: 'form_fills', strict: true, schema: FILLS_SCHEMA } },
+    response_format: { type: 'json_schema', json_schema: { name: task.schemaName, strict: true, schema: task.schema } },
   };
 
   let res = await call(config, withSchema, fetchImpl, signal);
@@ -88,7 +94,7 @@ export async function askOpenAiCompatible(config: OpenAiConfig, input: PromptInp
   const data = (await res.json()) as { choices?: { message?: { content?: string | null; refusal?: string | null } }[] };
   const message = data.choices?.[0]?.message;
   if (message?.refusal) throw new AiError(`The model declined: ${message.refusal}`);
-  const reply = parseFillsReply(message?.content ?? '');
+  const reply = task.parse(message?.content ?? '');
   if (!reply) throw new AiError("The model's reply wasn't in the expected format. Try again, or try a larger model.");
   return reply;
 }

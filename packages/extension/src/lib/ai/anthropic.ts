@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { buildUserMessage, FILLS_SCHEMA, parseFillsReply, SYSTEM_PROMPT, type PromptInput } from '@formhand/core';
+import type { PromptInput } from '@formhand/core';
 import { AiError, type AiReply } from './errors';
+import { fillTask, type AiTask } from './tasks';
 
 export interface AnthropicConfig {
   apiKey: string;
@@ -24,12 +25,17 @@ function friendly(error: unknown): AiError {
   return error instanceof AiError ? error : new AiError((error as Error).message);
 }
 
+/** Asks Claude for fills. */
+export function askClaude(config: AnthropicConfig, input: PromptInput, signal?: AbortSignal, fetchImpl?: typeof fetch): Promise<AiReply> {
+  return runClaude(config, fillTask(input), signal, fetchImpl);
+}
+
 /**
- * Asks Claude for fills. Uses structured outputs so the reply always parses, low
- * effort because mapping facts onto fields is quick work, and Anthropic's default
+ * Runs a task on Claude. Uses structured outputs so the reply always parses, low
+ * effort because picking facts out of text is quick work, and Anthropic's default
  * refusal fallback on the models that support it.
  */
-export async function askClaude(config: AnthropicConfig, input: PromptInput, signal?: AbortSignal, fetchImpl?: typeof fetch): Promise<AiReply> {
+export async function runClaude<T>(config: AnthropicConfig, task: AiTask<T>, signal?: AbortSignal, fetchImpl?: typeof fetch): Promise<T> {
   const client = new Anthropic({
     apiKey: config.apiKey,
     baseURL: config.baseUrl,
@@ -43,24 +49,34 @@ export async function askClaude(config: AnthropicConfig, input: PromptInput, sig
       {
         model: config.model,
         max_tokens: 16000,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: buildUserMessage(input) }],
+        system: task.system,
+        messages: [
+          {
+            role: 'user',
+            content: task.pdf
+              ? [
+                  { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: task.pdf } },
+                  { type: 'text', text: task.user },
+                ]
+              : task.user,
+          },
+        ],
         output_config: {
           ...(EFFORT_MODELS.test(config.model) && { effort: 'low' as const }),
-          format: { type: 'json_schema', schema: FILLS_SCHEMA as unknown as Record<string, unknown> },
+          format: { type: 'json_schema', schema: task.schema },
         },
         ...(FALLBACK_MODELS.has(config.model) && { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const }),
       },
       { signal },
     );
     if (response.stop_reason === 'refusal') {
-      throw new AiError('Claude declined to fill this form. Try different instructions, or fill it from pasted text.');
+      throw new AiError(task.declined);
     }
     if (response.stop_reason === 'max_tokens') {
-      throw new AiError('The reply was cut off. Try a shorter "Your info", or fill the form in two parts.');
+      throw new AiError(task.cutOff);
     }
     const text = response.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('');
-    const reply = parseFillsReply(text);
+    const reply = task.parse(text);
     if (!reply) throw new AiError("Claude's reply wasn't in the expected format. Try again.");
     return reply;
   } catch (error) {
