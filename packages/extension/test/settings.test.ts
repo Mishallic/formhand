@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
-import { DEFAULT_SETTINGS, loadProfiles, loadSettings, providerConfig, providerProblem, saveProfiles, saveSettings } from '../src/lib/settings';
+import { DEFAULT_SETTINGS, loadMemory, loadProfiles, loadSettings, onMemoryChanged, providerConfig, providerProblem, saveMemory, saveProfiles, saveSettings } from '../src/lib/settings';
 
 beforeEach(() => {
   fakeBrowser.reset();
@@ -36,5 +36,24 @@ describe('settings', () => {
     expect(await loadProfiles()).toEqual({ profiles: [], activeId: undefined });
     await saveProfiles([{ id: 'p1', name: 'Me', text: 'Name: Jane' }], 'p1');
     expect(await loadProfiles()).toEqual({ profiles: [{ id: 'p1', name: 'Me', text: 'Name: Jane' }], activeId: 'p1' });
+  });
+});
+
+describe('remembered answers', () => {
+  it('are on by default, and an older stored settings object gets the default', async () => {
+    expect(DEFAULT_SETTINGS.memory).toEqual({ enabled: true });
+    await fakeBrowser.storage.local.set({ settings: { provider: 'ollama', bridge: { enabled: false, pairingCode: '' } } });
+    expect((await loadSettings()).memory).toEqual({ enabled: true });
+  });
+
+  it('round-trip and tell listeners when they change', async () => {
+    expect(await loadMemory()).toEqual([]);
+    const seen: unknown[] = [];
+    const stop = onMemoryChanged((m) => seen.push(m));
+    const memory = [{ question: 'Notice period', value: '3 months', kind: 'text' as const, site: 'a.test', at: '2026-11-03' }];
+    await saveMemory(memory);
+    expect(await loadMemory()).toEqual(memory);
+    expect(seen).toEqual([memory]);
+    stop();
   });
 });

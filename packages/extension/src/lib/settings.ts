@@ -1,3 +1,4 @@
+import type { RememberedAnswer } from '@formhand/core';
 import { browser } from 'wxt/browser';
 import { PROVIDERS, type ProviderId } from './ai/providers';
 
@@ -13,6 +14,8 @@ export interface Settings {
   providers: Partial<Record<ProviderId, Partial<ProviderSettings>>>;
   /** `ports` overrides the helper's default ports; only tests and unusual setups need it. */
   bridge: { enabled: boolean; pairingCode: string; ports?: number[] };
+  /** Whether answers you approve are kept for later forms. */
+  memory: { enabled: boolean };
 }
 
 export interface Profile {
@@ -25,9 +28,10 @@ export const DEFAULT_SETTINGS: Settings = {
   provider: 'anthropic',
   providers: {},
   bridge: { enabled: false, pairingCode: '' },
+  memory: { enabled: true },
 };
 
-const KEYS = { settings: 'settings', profiles: 'profiles', activeProfile: 'activeProfile', draft: 'draft' } as const;
+const KEYS = { settings: 'settings', profiles: 'profiles', activeProfile: 'activeProfile', draft: 'draft', memory: 'memory' } as const;
 
 export async function loadSettings(): Promise<Settings> {
   const stored = (await browser.storage.local.get(KEYS.settings))[KEYS.settings] as Partial<Settings> | undefined;
@@ -36,6 +40,7 @@ export async function loadSettings(): Promise<Settings> {
     ...stored,
     providers: { ...stored?.providers },
     bridge: { ...DEFAULT_SETTINGS.bridge, ...stored?.bridge },
+    memory: { ...DEFAULT_SETTINGS.memory, ...stored?.memory },
   };
 }
 
@@ -83,6 +88,23 @@ export async function loadDraft(): Promise<string> {
 
 export async function saveDraft(text: string): Promise<void> {
   await browser.storage.local.set({ [KEYS.draft]: text });
+}
+
+/** Answers kept from earlier fills, newest first. */
+export async function loadMemory(): Promise<RememberedAnswer[]> {
+  return ((await browser.storage.local.get(KEYS.memory))[KEYS.memory] as RememberedAnswer[] | undefined) ?? [];
+}
+
+export async function saveMemory(memory: RememberedAnswer[]): Promise<void> {
+  await browser.storage.local.set({ [KEYS.memory]: memory });
+}
+
+export function onMemoryChanged(listener: (memory: RememberedAnswer[]) => void): () => void {
+  const handler = (changes: Record<string, { newValue?: unknown }>, area: string) => {
+    if (area === 'local' && KEYS.memory in changes) listener((changes[KEYS.memory]!.newValue as RememberedAnswer[] | undefined) ?? []);
+  };
+  browser.storage.onChanged.addListener(handler);
+  return () => browser.storage.onChanged.removeListener(handler);
 }
 
 export function onSettingsChanged(listener: (settings: Settings) => void): () => void {
