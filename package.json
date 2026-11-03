@@ -17,6 +17,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npm run build && npm run test:e2e -w @formhand/extension",
+    "test:e2e:firefox": "npm run build -w @formhand/mcp && npm run build -w @formhand/extension -- -b firefox && npm run test:e2e:firefox -w @formhand/extension",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "mcp:setup": "node packages/mcp/dist/formhand-mcp.js setup"
   },
