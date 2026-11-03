@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build the MCP helper and the extension for every browser
+        run: npm run build:all
+      - name: Lint the Firefox build
+        working-directory: packages/extension
+        run: npx web-ext lint --source-dir .output/firefox-mv2
+      - name: Install Chromium for end-to-end tests
+        working-directory: packages/extension
+        run: npx playwright install --with-deps --no-shell chromium
+      - name: End-to-end tests
+        run: npm run test:e2e -w @formhand/extension
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: packages/extension/test-results
+          retention-days: 7
