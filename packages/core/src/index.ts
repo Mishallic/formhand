@@ -7,3 +7,4 @@ export * from './match';
 export * from './prompt';
 export * from './protocol';
 export * from './memory';
+export * from './resume';
