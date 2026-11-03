@@ -38,7 +38,7 @@ A browser extension that fills in web forms for you, from text you paste, from t
 1. **Reading the form.** The content script walks the page, including open shadow roots. It lists each visible input, select and textarea with its label, worked out in this order: `aria-labelledby`, then `<label>`, `aria-label`, `title`, the text just before the field, and the table cell beside it. It also records the field's section (fieldset legend or heading), options, current value and limits. Radio buttons sharing a name become one field with options. Each field gets an id (`f1`, `f2`, ...) that stays the same across re-reads of the page.
 2. **Matching without AI** ([match.ts](packages/core/src/match.ts)). Each pasted key and each field is mapped to a concept such as `given-name`, `email` or `postal-code`, using the HTML autocomplete vocabulary plus synonyms ("surname", "zip", "mobile"). In "Company email" the last noun wins, so it maps to email. Keys and fields are then scored on concept and word overlap. Values that can't fit are penalised: "Jane" won't go into an email box, and "Mars" won't go into a country list. Each field is filled at most once, best score first. A full name is split over first and last name fields (and the reverse), "Confirm email" reuses the email, "USA" picks "United States", and "14/02/1991" becomes `1991-02-14`.
 3. **Asking an AI** ([prompt.ts](packages/core/src/prompt.ts)). One prompt is shared by the API route and the chat route. The model gets a compact JSON line per field and must answer `{"fills":[{"id","value"}],"notes"}`. Claude is called through the official SDK with a JSON-schema reply, low effort and Anthropic's default refusal fallback. Other providers get a JSON-schema `response_format`, and Formhand retries without it on servers that don't support one. The prompt tells the model that page text is data, not instructions, and never to invent personal details.
-4. **Filling** ([fill.ts](packages/extension/src/lib/dom/fill.ts)). Values are set through the element prototype's native setter, followed by `input` and `change` events. That is what makes React, Vue and similar libraries register the change. A unit test fills a real React form and checks its state. Checkboxes and radios are clicked. If the browser rejects a value, as with "lots" in a number field, the old value goes back and the reason is reported.
+4. **Filling** ([fill.ts](packages/extension/src/lib/dom/fill.ts)). Values are set through the element prototype's native setter, followed by `input` and `change` events. That is what makes React, Vue and similar libraries register the change. A unit test fills a real React form and checks its state, and the end-to-end tests do the same in Chromium and Firefox. Checkboxes and radios are clicked. If the browser rejects a value, as with "lots" in a number field, the old value goes back and the reason is reported.
 5. **The MCP bridge** ([bridge.ts](packages/mcp/src/bridge.ts), [bridge-client.ts](packages/extension/src/lib/bridge-client.ts)). Your AI app starts `formhand-mcp` as a stdio MCP server. The helper also listens on `127.0.0.1`, using the first free port from 17345 to 17349, so several AI apps can run at once. The extension's background script connects to every helper it finds.
    - **Security:** web pages are refused at the handshake by their Origin header, and the first message must carry the pairing code, which is compared in constant time.
    - **Keeping Chrome awake:** pings keep Chrome's service worker alive while a helper is connected, and an alarm looks for new helpers every 30 seconds.
@@ -76,8 +76,9 @@ Formhand has no server, no account and no telemetry.
 ## Tests
 
 ```
-npm test            # 134 unit tests: core 63, mcp 27, extension 44
-npm run test:e2e    # builds, then 8 Playwright tests against the real extension in Chromium
+npm test                  # 134 unit tests: core 63, mcp 27, extension 44
+npm run test:e2e          # builds, then 9 Playwright tests against the real extension in Chromium
+npm run test:e2e:firefox  # builds for Firefox, then 11 tests in your installed Firefox
 npm run typecheck
 ```
 
@@ -96,13 +97,15 @@ npm run typecheck
   - Provider error messages and the bridge client's reconnect and pairing behavior.
 - **End to end** ([e2e/](packages/extension/e2e)): loads the built extension into Chromium and fills a job application page through every route:
   - pasted text, with editing a value, unticking one, and undo;
+  - a React form, checking React's own state rather than the DOM;
   - a fake OpenAI-compatible server, checking the prompt never mentions the password or the trap field;
   - a chat app reply;
   - the real `formhand-mcp` process started over stdio the way an AI app starts it;
   - a wrong pairing code;
   - a second copy of the content script injected into an open tab, which must take over without filling twice.
+- **End to end in Firefox** ([e2e/firefox/](packages/extension/e2e/firefox)): Playwright can't load Firefox extensions, so these tests drive a real Firefox through geckodriver (Selenium), with Playwright only as the test runner. They run the same journeys, because Firefox differs where it matters: content scripts see the page through Xray wrappers, the background is a Manifest V2 page, and the clipboard and WebSocket paths are its own. The chat test pastes what Firefox really put on the clipboard. Two more tests click Formhand's button in the toolbar's Extensions menu to open and close the sidebar, and check the Alt+Shift+F shortcut. The panel is opened as a tab so the tests can read it; set `HEADED=1` to watch, or `FIREFOX_BIN` to pick a Firefox.
 
-CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the type check, the unit tests, builds for all three browsers, Mozilla's `web-ext lint` and the end-to-end tests.
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the type check, the unit tests, builds for all three browsers, Mozilla's `web-ext lint` and the end-to-end tests in Chromium and Firefox.
 
 ## Limits
 
@@ -111,7 +114,7 @@ CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the type check, t
 - **MCP fills without the side-panel preview.** The AI app says what it filled, the fields are outlined, and `undo_fill` or the panel's undo puts them back.
 - **ChatGPT can't use the MCP route.** ChatGPT only connects to remote MCP servers, so it can't reach the local helper. Use the chat-app route or an OpenAI key instead.
 - **API keys are stored unencrypted** in the extension's local storage, as with most extensions. Anyone with access to your browser profile could read them.
-- **Firefox** is built and checked with `web-ext lint` (no errors; two warnings for `innerHTML` inside React DOM's own code), but it isn't driven by the automated tests, because Playwright can't load Firefox extensions. It hasn't been tried by hand yet.
+- **Firefox keeps Formhand only until it restarts**, until the add-on is signed by Mozilla (listed on addons.mozilla.org or signed for self-distribution). `web-ext lint` reports no errors and two warnings, for `innerHTML` inside React DOM's own code.
 - **Ambiguous dates** like 03/04/1990 follow your browser's language: month first only for en-US.
 
 ## Deliberately left out
