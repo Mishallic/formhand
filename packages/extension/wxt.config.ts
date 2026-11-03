@@ -3,6 +3,13 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   srcDir: 'src',
   modules: ['@wxt-dev/module-react'],
+  zip: {
+    artifactTemplate: 'formhand-{{version}}-{{browser}}.zip',
+    sourcesTemplate: 'formhand-{{version}}-sources.zip',
+    // Firefox reviewers rebuild from source, which needs the whole workspace (core lives outside this package).
+    sourcesRoot: '../..',
+    excludeSources: ['docs/**', '**/.output/**', '**/test-results/**', '**/playwright-report/**', 'packages/mcp/dist/**'],
+  },
   manifest: ({ browser }) => ({
     name: 'Formhand',
     description: 'Fill web forms from pasted text, your AI provider, or the AI app on your computer (MCP).',
@@ -20,7 +27,7 @@ export default defineConfig({
       browser_specific_settings: {
         gecko: {
           id: 'formhand@mishallic.dev',
-          strict_min_version: '128.0',
+          strict_min_version: '142.0',
           // Formhand has no server. Form fields and your info reach a third party only
           // when you choose an AI provider and press "Fill with AI".
           data_collection_permissions: { required: ['none'] },
