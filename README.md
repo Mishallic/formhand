@@ -82,7 +82,7 @@ Formhand has no server, no account and no telemetry.
 ## Tests
 
 ```
-npm test                  # 160 unit tests: core 78, mcp 27, extension 55
+npm test                  # 161 unit tests: core 78, mcp 28, extension 55
 npm run test:e2e          # builds, then 12 Playwright tests against the real extension in Chromium
 npm run test:e2e:firefox  # builds for Firefox, then 14 tests in your installed Firefox
 npm run typecheck

@@ -1,5 +1,5 @@
 import { createServer } from 'node:net';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { CLOSE_BAD_TOKEN, type HelperToExtension } from '@formhand/core';
 import { Bridge, BridgeError, NOT_CONNECTED } from '../src/bridge';
@@ -181,6 +181,24 @@ describe('Bridge', () => {
     chrome.send({ type: 'focus' });
     await new Promise((r) => setTimeout(r, 20));
     await expect(bridge.request('undo_fill', {})).resolves.toEqual({ restored: 1 });
+  });
+
+  it('tells apart two browsers that connect within the same millisecond', async () => {
+    // CI once paired both fake browsers in one millisecond; the clock can't order them.
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_800_000_000_000);
+    try {
+      const bridge = await startBridge();
+      const chrome = await FakeExtension.paired(bridge.port!, CODE, 'chrome');
+      const firefox = await FakeExtension.paired(bridge.port!, CODE, 'firefox');
+      chrome.serve(() => ({ restored: 1 }));
+      firefox.serve(() => ({ restored: 2 }));
+      await expect(bridge.request('undo_fill', {})).resolves.toEqual({ restored: 2 });
+      chrome.send({ type: 'focus' });
+      await new Promise((r) => setTimeout(r, 20));
+      await expect(bridge.request('undo_fill', {})).resolves.toEqual({ restored: 1 });
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it('moves to the next port when one is taken', async () => {

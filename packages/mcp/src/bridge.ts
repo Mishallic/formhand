@@ -32,6 +32,10 @@ export class BridgeError extends Error {}
 interface Connection {
   socket: WebSocket;
   browser: string;
+  /**
+   * When the browser last connected or was focused, as a count: higher is more recent.
+   * Not a clock time, because two browsers can connect within the same millisecond.
+   */
   lastActive: number;
 }
 
@@ -56,6 +60,8 @@ export const NOT_CONNECTED =
 export class Bridge {
   private wss?: WebSocketServer;
   private readonly connections = new Set<Connection>();
+  /** Counts connects and focus events, to order browsers by most recent use. */
+  private activity = 0;
   private readonly pending = new Map<string, Pending>();
   private readonly events = new EventEmitter();
   private clientName?: string;
@@ -133,7 +139,7 @@ export class Bridge {
           socket.close(CLOSE_BAD_TOKEN, 'wrong pairing code');
           return;
         }
-        connection = { socket, browser: message.browser, lastActive: Date.now() };
+        connection = { socket, browser: message.browser, lastActive: ++this.activity };
         this.connections.add(connection);
         this.log(`${message.browser} connected`);
         this.send(socket, this.welcome());
@@ -164,7 +170,7 @@ export class Bridge {
         this.send(connection.socket, { type: 'pong' });
         return;
       case 'focus':
-        connection.lastActive = Date.now();
+        connection.lastActive = ++this.activity;
         return;
       case 'result': {
         const p = this.pending.get(message.requestId);
