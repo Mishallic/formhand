@@ -2,9 +2,9 @@ const ATTR = 'data-formhand-filled';
 const STYLE_ID = 'formhand-highlight-style';
 
 const CSS = `[${ATTR}] {
-  outline: 2px solid #6d5ef5 !important;
+  outline: 2px solid #2f44d0 !important;
   outline-offset: 1px !important;
-  background-color: rgba(109, 94, 245, 0.08) !important;
+  background-color: rgba(47, 68, 208, 0.07) !important;
   transition: outline-color 0.3s ease;
 }`;
 
