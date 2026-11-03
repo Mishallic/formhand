@@ -1,4 +1,4 @@
-import type { Fill, FillResult, FormSnapshot } from '@formhand/core';
+import type { BridgeMethod, Fill, FillResult, FormSnapshot } from '@formhand/core';
 
 /** Requests the side panel and the background send to the content script in a tab. */
 export type PageRequest = { type: 'formhand:scan' } | { type: 'formhand:fill'; fills: Fill[] } | { type: 'formhand:undo' };
@@ -24,6 +24,12 @@ export interface BridgeStatus {
   state: 'off' | 'searching' | 'connected' | 'bad-code';
   apps: BridgeApp[];
 }
+
+/** What the background tells open side panels, unasked. */
+export type BackgroundBroadcast =
+  | { type: 'bridge:status-changed'; status: BridgeStatus }
+  /** An AI app used the bridge on the active tab ("filled 5 fields"). */
+  | { type: 'bridge:activity'; method: BridgeMethod; clientName?: string; summary: string };
 
 export function isPageRequest(message: unknown): message is PageRequest {
   const type = (message as { type?: unknown } | null)?.type;

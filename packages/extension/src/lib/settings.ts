@@ -70,7 +70,9 @@ export async function loadProfiles(): Promise<{ profiles: Profile[]; activeId?: 
 }
 
 export async function saveProfiles(profiles: Profile[], activeId?: string): Promise<void> {
-  await browser.storage.local.set({ [KEYS.profiles]: profiles, [KEYS.activeProfile]: activeId ?? null });
+  await browser.storage.local.set({ [KEYS.profiles]: profiles });
+  if (activeId) await browser.storage.local.set({ [KEYS.activeProfile]: activeId });
+  else await browser.storage.local.remove(KEYS.activeProfile);
 }
 
 /** Unsaved text in the Fill box, kept so closing the panel doesn't lose it. */
