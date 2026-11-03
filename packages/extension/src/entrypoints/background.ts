@@ -62,8 +62,8 @@ export default defineBackground({
       },
     });
 
-    void loadSettings().then((s) => bridge.configure(s.bridge.enabled, s.bridge.pairingCode));
-    onSettingsChanged((s) => bridge.configure(s.bridge.enabled, s.bridge.pairingCode));
+    void loadSettings().then((s) => bridge.configure(s.bridge.enabled, s.bridge.pairingCode, s.bridge.ports));
+    onSettingsChanged((s) => bridge.configure(s.bridge.enabled, s.bridge.pairingCode, s.bridge.ports));
 
     // Look for helpers that started after us (an AI app opened later). Chrome wakes the
     // service worker for alarms at most every 30 seconds.

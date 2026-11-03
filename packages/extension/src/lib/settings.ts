@@ -11,7 +11,8 @@ export interface Settings {
   provider: ProviderId;
   /** Per-provider overrides; missing values fall back to the preset. */
   providers: Partial<Record<ProviderId, Partial<ProviderSettings>>>;
-  bridge: { enabled: boolean; pairingCode: string };
+  /** `ports` overrides the helper's default ports; only tests and unusual setups need it. */
+  bridge: { enabled: boolean; pairingCode: string; ports?: number[] };
 }
 
 export interface Profile {

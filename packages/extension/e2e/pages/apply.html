@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Apply: Product designer at Northwind</title>
+    <style>
+      body { font: 15px/1.5 system-ui, sans-serif; margin: 0; background: #f3f4f7; color: #1d2330; }
+      main { max-width: 640px; margin: 32px auto; background: #fff; padding: 28px 32px; border-radius: 8px; border: 1px solid #dde1e8; }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      p.lead { margin: 0 0 20px; color: #5b6272; }
+      fieldset { border: 0; padding: 0; margin: 0 0 18px; }
+      legend { font-weight: 650; margin-bottom: 8px; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+      label { display: block; font-size: 13px; color: #4b5263; }
+      input:not([type=radio]):not([type=checkbox]), select, textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 8px 10px; border: 1px solid #c4c9d4; border-radius: 6px; font: inherit; }
+      .choice { display: flex; gap: 8px; align-items: center; font-size: 14px; color: #1d2330; }
+      .trap { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+      button { background: #1d2330; color: #fff; border: 0; padding: 10px 18px; border-radius: 6px; font: inherit; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Product designer</h1>
+      <p class="lead">Northwind, Oslo. Tell us a little about yourself.</p>
+      <form id="apply">
+        <fieldset>
+          <legend>About you</legend>
+          <div class="grid">
+            <label for="first">First name<input id="first" name="first_name" autocomplete="given-name" required /></label>
+            <label for="last">Last name<input id="last" name="last_name" autocomplete="family-name" required /></label>
+            <label>Email<input type="email" name="email" autocomplete="email" required /></label>
+            <label>Confirm email<input type="email" name="email_confirm" /></label>
+            <label>Phone<input type="tel" name="phone" /></label>
+            <label>Date of birth<input type="date" name="dob" /></label>
+          </div>
+          <label style="margin-top: 12px">Create a password<input type="password" name="password" /></label>
+          <div class="trap" aria-hidden="false"><label>Leave this empty<input name="website_hp" tabindex="-1" /></label></div>
+        </fieldset>
+        <fieldset>
+          <legend>Address</legend>
+          <div class="grid">
+            <label style="grid-column: span 2">Street address<input name="street" autocomplete="address-line1" /></label>
+            <label>City<input name="city" /></label>
+            <label>Postcode<input name="postcode" /></label>
+            <label style="grid-column: span 2">Country
+              <select name="country">
+                <option value="">Choose a country</option>
+                <option value="dk">Denmark</option>
+                <option value="no">Norway</option>
+                <option value="se">Sweden</option>
+                <option value="gb">United Kingdom</option>
+                <option value="us">United States</option>
+              </select>
+            </label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Position applied for</legend>
+          <label class="choice"><input type="radio" name="role" value="designer" /> Product designer</label>
+          <label class="choice"><input type="radio" name="role" value="engineer" /> Frontend engineer</label>
+          <label class="choice"><input type="radio" name="role" value="pm" /> Product manager</label>
+        </fieldset>
+        <label>Years of experience<input type="number" name="years" min="0" /></label>
+        <label style="margin-top: 12px">Why Northwind?<textarea name="why" rows="4" maxlength="600"></textarea></label>
+        <label class="choice" style="margin: 14px 0 18px"><input type="checkbox" name="newsletter" /> Send me news about open roles</label>
+        <button type="submit">Send application</button>
+      </form>
+    </main>
+    <script>
+      // Records what page scripts would see, so tests can check events fire.
+      window.__events = [];
+      document.getElementById('apply').addEventListener('input', (e) => window.__events.push(['input', e.target.name]));
+      document.getElementById('apply').addEventListener('change', (e) => window.__events.push(['change', e.target.name]));
+      document.getElementById('apply').addEventListener('submit', (e) => {
+        e.preventDefault();
+        window.__submitted = true;
+      });
+    </script>
+  </body>
+</html>

@@ -39,17 +39,18 @@ export class BridgeClient {
   private badCode = false;
   private readonly links = new Map<number, Link>();
   private heartbeat?: ReturnType<typeof setInterval>;
+  private ports: number[];
 
-  constructor(private readonly options: BridgeClientOptions) {}
-
-  private get ports(): number[] {
-    return this.options.ports ?? DEFAULT_PORTS;
+  constructor(private readonly options: BridgeClientOptions) {
+    this.ports = options.ports ?? DEFAULT_PORTS;
   }
 
-  configure(enabled: boolean, pairingCode: string): void {
+  configure(enabled: boolean, pairingCode: string, ports?: number[]): void {
     const code = pairingCode.trim();
-    if (code !== this.code) {
+    const nextPorts = ports?.length ? ports : (this.options.ports ?? DEFAULT_PORTS);
+    if (code !== this.code || nextPorts.join() !== this.ports.join()) {
       this.code = code;
+      this.ports = nextPorts;
       this.badCode = false;
       this.closeAll();
     }

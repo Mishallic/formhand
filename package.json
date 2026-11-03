@@ -16,7 +16,7 @@
     "dev": "npm run dev -w @formhand/extension",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "npm run test:e2e -w @formhand/extension",
+    "test:e2e": "npm run build && npm run test:e2e -w @formhand/extension",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "mcp:setup": "node packages/mcp/dist/formhand-mcp.js setup"
   },
