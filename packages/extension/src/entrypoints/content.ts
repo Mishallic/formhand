@@ -3,12 +3,6 @@ import { defineContentScript } from 'wxt/utils/define-content-script';
 import { PageController } from '../lib/dom/page';
 import { isPageRequest, type PageRequest, type Reply } from '../lib/messages';
 
-declare global {
-  interface Window {
-    __formhand?: PageController;
-  }
-}
-
 function handle(page: PageController, message: PageRequest): unknown {
   switch (message.type) {
     case 'formhand:scan':
@@ -23,19 +17,20 @@ function handle(page: PageController, message: PageRequest): unknown {
 export default defineContentScript({
   matches: ['<all_urls>'],
   runAt: 'document_idle',
-  main() {
-    // The background injects this script again into tabs opened before install; run once.
-    if (window.__formhand) return;
+  main(ctx) {
     const page = new PageController(document, { locale: navigator.language });
-    window.__formhand = page;
 
-    browser.runtime.onMessage.addListener((message: unknown, _sender, sendResponse: (reply: Reply<unknown>) => void) => {
+    const listener = (message: unknown, _sender: unknown, sendResponse: (reply: Reply<unknown>) => void) => {
       if (!isPageRequest(message)) return;
       try {
         sendResponse({ ok: true, data: handle(page, message) });
       } catch (error) {
         sendResponse({ ok: false, error: (error as Error).message });
       }
-    });
+    };
+    browser.runtime.onMessage.addListener(listener);
+    // A newer copy (after an extension update, or injected by the background) takes over;
+    // this one stops answering so a request is never handled twice.
+    ctx.onInvalidated(() => browser.runtime.onMessage.removeListener(listener));
   },
 });

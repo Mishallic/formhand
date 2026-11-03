@@ -105,6 +105,27 @@ test('fills the form from a chat app reply', async ({ openForm }) => {
   expect(await form.isChecked('[value=engineer]')).toBe(true);
 });
 
+test('a content script injected again takes over from the old one', async ({ openForm, serviceWorker }) => {
+  const { form, tabId } = await openForm();
+  const inTab = (request: unknown) =>
+    serviceWorker.evaluate(
+      // @ts-expect-error chrome is the extension API inside the worker
+      ([id, message]) => chrome.tabs.sendMessage(id, message, { frameId: 0 }),
+      [tabId, request] as const,
+    );
+  // What the background does for tabs that were open before an update.
+  await serviceWorker.evaluate(
+    // @ts-expect-error chrome is the extension API inside the worker
+    (id: number) => chrome.scripting.executeScript({ target: { tabId: id }, files: ['/content-scripts/content.js'] }),
+    tabId,
+  );
+  const reply = (await inTab({ type: 'formhand:fill', fills: [{ id: 'f1', value: 'Jane' }] })) as { ok: boolean; data: { filled: string[] } };
+  expect(reply).toEqual({ ok: true, data: { filled: ['f1'], skipped: [] } });
+  const events = (await form.evaluate(() => (window as unknown as { __events: string[][] }).__events)) as string[][];
+  // One copy answered: a second would have filled again and fired a second input event.
+  expect(events.filter(([type, name]) => type === 'input' && name === 'first_name')).toHaveLength(1);
+});
+
 test('says when the page has no form', async ({ context, server, serviceWorker, extensionId }) => {
   const page = await context.newPage();
   await page.goto(`${server.url}/missing`);
