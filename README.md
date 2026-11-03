@@ -77,7 +77,7 @@ Formhand has no server, no account and no telemetry.
 
 ```
 npm test            # 134 unit tests: core 63, mcp 27, extension 44
-npm run test:e2e    # builds, then 7 Playwright tests against the real extension in Chromium
+npm run test:e2e    # builds, then 8 Playwright tests against the real extension in Chromium
 npm run typecheck
 ```
 
@@ -99,7 +99,8 @@ npm run typecheck
   - a fake OpenAI-compatible server, checking the prompt never mentions the password or the trap field;
   - a chat app reply;
   - the real `formhand-mcp` process started over stdio the way an AI app starts it;
-  - a wrong pairing code.
+  - a wrong pairing code;
+  - a second copy of the content script injected into an open tab, which must take over without filling twice.
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the type check, the unit tests, builds for all three browsers, Mozilla's `web-ext lint` and the end-to-end tests.
 
