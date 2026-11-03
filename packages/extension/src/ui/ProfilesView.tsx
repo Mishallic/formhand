@@ -1,10 +1,16 @@
 import { useState } from 'react';
-import type { Profile } from '../lib/settings';
+import type { RememberedAnswer } from '@formhand/core';
+import type { Profile, Settings } from '../lib/settings';
+import { MemoryView } from './MemoryView';
+import { newProfileId, ResumeButton } from './ResumeButton';
 
 interface Props {
   profiles: Profile[];
   activeId?: string;
   onChange: (profiles: Profile[], activeId?: string) => void;
+  settings: Settings;
+  onSaveSettings: (settings: Settings) => void;
+  memory: RememberedAnswer[];
 }
 
 const EXAMPLE = `Name: Jane Doe
@@ -15,13 +21,16 @@ Company: Acme AS
 Job title: Product designer
 LinkedIn: https://www.linkedin.com/in/janedoe`;
 
-function newId(): string {
-  return `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-}
-
-export function ProfilesView({ profiles, activeId, onChange }: Props) {
+export function ProfilesView({ profiles, activeId, onChange, settings, onSaveSettings, memory }: Props) {
   const [editing, setEditing] = useState<Profile>();
+  /** What to check in a profile just made from a resume. */
+  const [importNote, setImportNote] = useState<string>();
   const [confirmDelete, setConfirmDelete] = useState<string>();
+
+  const close = () => {
+    setEditing(undefined);
+    setImportNote(undefined);
+  };
 
   function save() {
     if (!editing) return;
@@ -29,7 +38,7 @@ export function ProfilesView({ profiles, activeId, onChange }: Props) {
     const exists = profiles.some((p) => p.id === profile.id);
     const next = exists ? profiles.map((p) => (p.id === profile.id ? profile : p)) : [...profiles, profile];
     onChange(next, activeId ?? profile.id);
-    setEditing(undefined);
+    close();
   }
 
   function remove(id: string) {
@@ -46,6 +55,7 @@ export function ProfilesView({ profiles, activeId, onChange }: Props) {
       <div className="view">
         <section className="section">
           <h2 className="section-title">{isNew ? 'New profile' : `Edit ${editing.name}`}</h2>
+          {importNote && <div className="notice">{importNote}</div>}
           <label className="label" htmlFor="profile-name">
             Name
           </label>
@@ -59,7 +69,7 @@ export function ProfilesView({ profiles, activeId, onChange }: Props) {
             <button type="button" className="button primary" onClick={save}>
               Save profile
             </button>
-            <button type="button" className="button" onClick={() => setEditing(undefined)}>
+            <button type="button" className="button" onClick={close}>
               Cancel
             </button>
           </div>
@@ -73,13 +83,26 @@ export function ProfilesView({ profiles, activeId, onChange }: Props) {
       <section className="section">
         <div className="row spread">
           <h2 className="section-title">Profiles</h2>
-          <button type="button" className="button" onClick={() => setEditing({ id: newId(), name: '', text: '' })}>
-            New profile
-          </button>
+          <div className="row">
+            <ResumeButton
+              settings={settings}
+              label="From a resume"
+              onProfile={(profile, { fileName, problem }) => {
+                setEditing(profile);
+                setImportNote(problem ?? `Made from ${fileName}. Check the details, then save.`);
+              }}
+            />
+            <button type="button" className="button" onClick={() => setEditing({ id: newProfileId(), name: '', text: '' })}>
+              New profile
+            </button>
+          </div>
         </div>
-        <p className="help">Save the details you fill in often. Pick a profile on the Fill tab to load it. Profiles stay in this browser.</p>
+        <p className="help">
+          Save the details you fill in often, or make a profile from your resume (PDF, Word or text). Pick a profile on the Fill tab to load it. Profiles stay
+          in this browser; a resume is sent once to your AI provider to pick out your details.
+        </p>
         {profiles.length === 0 ? (
-          <p className="empty">No profiles yet. A profile with your name, email, phone and address covers most forms.</p>
+          <p className="empty">No profiles yet. Make one from your resume, or one with your name, email, phone and address: that covers most forms.</p>
         ) : (
           <div>
             {profiles.map((p) => (
@@ -118,6 +141,7 @@ export function ProfilesView({ profiles, activeId, onChange }: Props) {
           </div>
         )}
       </section>
+      <MemoryView memory={memory} settings={settings} onSaveSettings={onSaveSettings} />
     </div>
   );
 }

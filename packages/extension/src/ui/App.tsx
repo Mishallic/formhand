@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { loadProfiles, saveProfiles, type Profile } from '../lib/settings';
+import type { RememberedAnswer } from '@formhand/core';
+import { loadMemory, loadProfiles, onMemoryChanged, saveProfiles, type Profile } from '../lib/settings';
 import { FillView } from './FillView';
 import { useBridge, usePage, useSettings } from './hooks';
 import { Mark, RefreshIcon } from './icons';
@@ -22,6 +23,7 @@ export function App() {
   const { settings, update } = useSettings();
   const [profiles, setProfiles] = useState<{ list: Profile[]; activeId?: string }>();
   const [toast, setToast] = useState<string>();
+  const [memory, setMemory] = useState<RememberedAnswer[]>([]);
 
   const { status: bridge, reconnect } = useBridge(
     useCallback(
@@ -35,6 +37,8 @@ export function App() {
 
   useEffect(() => {
     void loadProfiles().then(({ profiles: list, activeId }) => setProfiles({ list, activeId }));
+    void loadMemory().then(setMemory);
+    return onMemoryChanged(setMemory);
   }, []);
 
   useEffect(() => {
@@ -98,11 +102,20 @@ export function App() {
               profiles={profiles.list}
               activeProfileId={profiles.activeId}
               onPickProfile={(id) => changeProfiles(profiles.list, id)}
+              onAddProfile={(profile) => changeProfiles([...profiles.list, profile], profile.id)}
               goToSettings={() => setTab('settings')}
+              memory={memory}
             />
           </main>
           <main className="panel" hidden={tab !== 'profiles'}>
-            <ProfilesView profiles={profiles.list} activeId={profiles.activeId} onChange={changeProfiles} />
+            <ProfilesView
+              profiles={profiles.list}
+              activeId={profiles.activeId}
+              onChange={changeProfiles}
+              settings={settings}
+              onSaveSettings={(next) => void update(next)}
+              memory={memory}
+            />
           </main>
           <main className="panel" hidden={tab !== 'settings'}>
             <SettingsView settings={settings} onSave={update} bridge={bridge} onReconnect={reconnect} />

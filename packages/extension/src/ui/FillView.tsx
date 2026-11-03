@@ -1,18 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  answersToRemember,
   buildChatPrompt,
   fillsToProposals,
   matchPairs,
+  memoryPairs,
   parseFillsReply,
   parsePasted,
+  questionKey,
+  rememberAnswers,
+  sameMemory,
   type FormField,
   type FormSnapshot,
   type Proposal,
+  type RememberedAnswer,
 } from '@formhand/core';
 import { askAi, AiError, PROVIDERS } from '../lib/ai';
-import { loadDraft, providerProblem, saveDraft, type Profile, type Settings } from '../lib/settings';
+import { loadDraft, providerProblem, saveDraft, saveMemory, type Profile, type Settings } from '../lib/settings';
 import { sendToTab } from '../lib/tabs';
 import { CopyIcon, SparkIcon, UndoIcon } from './icons';
+import { ResumeButton } from './ResumeButton';
 
 interface Row {
   fieldId: string;
@@ -20,6 +27,18 @@ interface Row {
   checked: boolean;
   source: string;
   confidence: number;
+  /** Where the value came from: the info box, remembered answers, or the AI (or a chat app's reply). */
+  origin: 'info' | 'memory' | 'ai';
+  /** Set once the person changes the value in the preview. */
+  edited?: boolean;
+}
+
+function host(url: string): string {
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
 }
 
 type Message = { kind: 'error' | 'success' | 'info'; text: string; list?: string[]; action?: { label: string; run: () => void } };
@@ -81,10 +100,13 @@ interface Props {
   profiles: Profile[];
   activeProfileId?: string;
   onPickProfile: (id: string | undefined) => void;
+  /** Saves a new profile (made from a resume) and makes it the active one. */
+  onAddProfile: (profile: Profile) => void;
   goToSettings: () => void;
+  memory: RememberedAnswer[];
 }
 
-export function FillView({ tabId, snapshot, settings, profiles, activeProfileId, onPickProfile, goToSettings }: Props) {
+export function FillView({ tabId, snapshot, settings, profiles, activeProfileId, onPickProfile, onAddProfile, goToSettings, memory }: Props) {
   const [info, setInfo] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [instructions, setInstructions] = useState('');
@@ -95,7 +117,10 @@ export function FillView({ tabId, snapshot, settings, profiles, activeProfileId,
   const [message, setMessage] = useState<Message>();
   const [chatReply, setChatReply] = useState<string>();
   const [canUndo, setCanUndo] = useState(false);
+  /** Memory before and after the last fill, so undoing the fill takes its answers back out. */
+  const memoryUndo = useRef<{ before: RememberedAnswer[]; after: RememberedAnswer[] } | undefined>(undefined);
   const abort = useRef<AbortController | undefined>(undefined);
+  const remembered = settings.memory.enabled ? memory : [];
 
   const fields = snapshot?.fields ?? [];
   const byId = useMemo(() => new Map(fields.map((f) => [f.id, f])), [fields]);
@@ -127,10 +152,13 @@ export function FillView({ tabId, snapshot, settings, profiles, activeProfileId,
     setNotes(undefined);
     setMessage(undefined);
     setCanUndo(false);
+    memoryUndo.current = undefined;
   }, [snapshot?.url, tabId]);
 
-  function show(proposals: Proposal[], rejected: { id: string; reason: string }[], aiNotes?: string) {
-    setRows(proposals.map((p) => ({ fieldId: p.fieldId, value: p.value, checked: true, source: p.source, confidence: p.confidence })));
+  function show(proposals: Proposal[], rejected: { id: string; reason: string }[], aiNotes: string | undefined, originOf: (fieldId: string) => Row['origin']) {
+    setRows(
+      proposals.map((p) => ({ fieldId: p.fieldId, value: p.value, checked: true, source: p.source, confidence: p.confidence, origin: originOf(p.fieldId) })),
+    );
     setNotes(aiNotes);
     if (proposals.length === 0) {
       setMessage({ kind: 'info', text: 'Nothing in your info matched a field on this page. Fill with AI can work out less obvious matches.' });
@@ -147,16 +175,22 @@ export function FillView({ tabId, snapshot, settings, profiles, activeProfileId,
 
   function match() {
     const parsed = parsePasted(info);
-    if (parsed.kind === 'empty') {
+    if (parsed.kind === 'empty' && remembered.length === 0) {
       setMessage({ kind: 'error', text: 'Nothing to match. Paste lines like "Email: jane@example.com", a JSON object, or a reply from a chat app.' });
       return;
     }
     if (parsed.kind === 'fills') {
       const { proposals, rejected } = fillsToProposals(parsed.fills, fields, { locale });
-      show(proposals, rejected, parsed.notes);
-    } else {
-      show(matchPairs(parsed.pairs, fields, { locale }), []);
+      show(proposals, rejected, parsed.notes, () => 'ai');
+      return;
     }
+    // The info first; remembered answers only for the fields it left empty.
+    const fromInfo = parsed.kind === 'pairs' ? matchPairs(parsed.pairs, fields, { locale }) : [];
+    const taken = new Set(fromInfo.map((p) => p.fieldId));
+    const fromMemory = remembered.length ? matchPairs(memoryPairs(remembered), fields.filter((f) => !taken.has(f.id)), { locale }) : [];
+    const order = new Map(fields.map((f, i) => [f.id, i]));
+    const proposals = [...fromInfo, ...fromMemory].sort((a, b) => order.get(a.fieldId)! - order.get(b.fieldId)!);
+    show(proposals, [], undefined, (id) => (taken.has(id) ? 'info' : 'memory'));
   }
 
   async function fillWithAi() {
@@ -170,9 +204,9 @@ export function FillView({ tabId, snapshot, settings, profiles, activeProfileId,
     setBusy('ai');
     setMessage(undefined);
     try {
-      const reply = await askAi(settings, { snapshot, info, instructions }, abort.current.signal);
+      const reply = await askAi(settings, { snapshot, info, instructions, remembered }, abort.current.signal);
       const { proposals, rejected } = fillsToProposals(reply.fills, fields, { locale });
-      show(proposals, rejected, reply.notes);
+      show(proposals, rejected, reply.notes, () => 'ai');
     } catch (e) {
       setMessage({ kind: 'error', text: e instanceof AiError ? e.message : `Something went wrong: ${(e as Error).message}` });
     } finally {
@@ -182,7 +216,7 @@ export function FillView({ tabId, snapshot, settings, profiles, activeProfileId,
 
   async function copyPrompt() {
     if (!snapshot) return;
-    await navigator.clipboard.writeText(buildChatPrompt({ snapshot, info, instructions }));
+    await navigator.clipboard.writeText(buildChatPrompt({ snapshot, info, instructions, remembered }));
     setChatReply('');
     setMessage({ kind: 'info', text: 'Prompt copied. Paste it into ChatGPT, Claude or Gemini, then paste the reply below.' });
   }
@@ -194,7 +228,7 @@ export function FillView({ tabId, snapshot, settings, profiles, activeProfileId,
       return;
     }
     const { proposals, rejected } = fillsToProposals(reply.fills, fields, { locale });
-    show(proposals, rejected, reply.notes);
+    show(proposals, rejected, reply.notes, () => 'ai');
     setChatReply(undefined);
   }
 
@@ -206,9 +240,11 @@ export function FillView({ tabId, snapshot, settings, profiles, activeProfileId,
       const result = await sendToTab(tabId, { type: 'formhand:fill', fills: chosen.map((r) => ({ id: r.fieldId, value: r.value })) });
       setCanUndo(result.filled.length > 0);
       const n = result.filled.length;
+      const kept = await remember(chosen.filter((r) => result.filled.includes(r.fieldId)));
+      const keptLine = kept ? ` Formhand will remember ${kept} ${kept === 1 ? 'answer' : 'answers'} for later forms.` : '';
       setMessage({
         kind: result.skipped.length && !n ? 'error' : 'success',
-        text: n ? `Filled ${n} ${n === 1 ? 'field' : 'fields'}. Check them on the page, then submit.` : 'No fields were filled.',
+        text: n ? `Filled ${n} ${n === 1 ? 'field' : 'fields'}. Check them on the page, then submit.${keptLine}` : 'No fields were filled.',
         list: result.skipped.map((s) => `${nameById(s.id)}: ${s.reason}`),
       });
     } catch (e) {
@@ -218,12 +254,33 @@ export function FillView({ tabId, snapshot, settings, profiles, activeProfileId,
     }
   }
 
+  /**
+   * Keeps the filled answers the info didn't already have. Values matched from the info
+   * and left alone are in the info already; edited ones, AI answers and remembered
+   * answers (which get a fresh date) are kept. Returns how many.
+   */
+  async function remember(filled: Row[]): Promise<number> {
+    if (!settings.memory.enabled || !snapshot) return 0;
+    const fills = filled.filter((r) => r.origin !== 'info' || r.edited).map((r) => ({ id: r.fieldId, value: r.value }));
+    const answers = answersToRemember(fields, fills, { site: host(snapshot.url), at: new Date().toISOString(), info });
+    if (!answers.length) return 0;
+    const after = rememberAnswers(memory, answers);
+    memoryUndo.current = { before: memory, after };
+    await saveMemory(after);
+    // Remembered answers used again only get a fresh date; count the new or changed ones.
+    return answers.filter((a) => !memory.some((m) => questionKey(m.question) === questionKey(a.question) && m.value === a.value)).length;
+  }
+
   async function undo() {
     if (tabId === undefined) return;
     setBusy('undo');
     try {
       const { restored } = await sendToTab(tabId, { type: 'formhand:undo' });
       setCanUndo(false);
+      // Take this fill's answers back out, unless memory was changed since.
+      const last = memoryUndo.current;
+      memoryUndo.current = undefined;
+      if (last && sameMemory(memory, last.after)) await saveMemory(last.before);
       setMessage({ kind: 'info', text: restored ? `Put back the previous values in ${restored} ${restored === 1 ? 'field' : 'fields'}.` : 'There was nothing to undo.' });
     } catch (e) {
       setMessage({ kind: 'error', text: (e as Error).message });
@@ -282,6 +339,21 @@ export function FillView({ tabId, snapshot, settings, profiles, activeProfileId,
               Add instructions for the AI
             </button>
           )}
+          <ResumeButton
+            settings={settings}
+            label="Upload a resume"
+            className="link-button"
+            onProfile={(profile, { fileName, problem }) => {
+              onAddProfile(profile);
+              setInfo(profile.text);
+              setMessage({
+                kind: 'info',
+                text: problem
+                  ? `${problem} It’s saved as the profile “${profile.name}”.`
+                  : `Made the profile “${profile.name}” from ${fileName}. Press Fill with AI, or Match fields.`,
+              });
+            }}
+          />
           <div className="row">
             <button type="button" className="button" onClick={match} disabled={!snapshot || noForm || !!busy}>
               Match fields
@@ -361,13 +433,14 @@ export function FillView({ tabId, snapshot, settings, profiles, activeProfileId,
               const field = byId.get(row.fieldId);
               if (!field) return null;
               const unsure = row.confidence < 0.75;
-              const update = (patch: Partial<Row>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+              const update = (patch: Partial<Row>) =>
+                setRows(rows.map((r, j) => (j === i ? { ...r, ...patch, edited: r.edited || (patch.value !== undefined && patch.value !== r.value) } : r)));
               return (
                 <div key={row.fieldId} className={`entry${row.checked ? '' : ' off'}${unsure ? ' unsure' : ''}`}>
                   <input type="checkbox" className="tick" aria-label={`Fill ${nameOf(field)}`} checked={row.checked} onChange={(e) => update({ checked: e.target.checked })} />
                   <div className="entry-label" title={unsure ? 'A loose match: check it' : undefined}>
                     <span className="name">{nameOf(field)}</span>
-                    <span className="source">{row.source === 'AI' ? `from ${provider.label.split(' (')[0]}` : `from “${row.source}”`}</span>
+                    <span className="source">{row.origin === 'memory' ? 'remembered' : row.source === 'AI' ? `from ${provider.label.split(' (')[0]}` : `from “${row.source}”`}</span>
                   </div>
                   <ValueInput field={field} name={nameOf(field)} value={row.value} onChange={(value) => update({ value })} />
                 </div>

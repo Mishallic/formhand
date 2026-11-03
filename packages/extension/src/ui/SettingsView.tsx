@@ -232,9 +232,10 @@ export function SettingsView({ settings, onSave, bridge, onReconnect }: Props) {
       <section className="section">
         <h2 className="section-title">What leaves your computer</h2>
         <p className="help">
-          Formhand has no server. Your profiles and pasted text stay in this browser. Fill with AI sends the page's field labels and your info to{' '}
-          {preset.local ? 'the model running on this computer' : preset.label}, and nothing else. Passwords, card numbers and one-time codes are never read. While
-          the MCP box is ticked, connected AI apps can read and fill the form in your active tab; it is never submitted for you.
+          Formhand has no server. Your profiles, pasted text and remembered answers stay in this browser. Fill with AI sends the page's field labels, your info
+          and your remembered answers to {preset.local ? 'the model running on this computer' : preset.label}, and nothing else. A resume is read in this browser,
+          and its text is sent there once to pick out your details. Passwords, card numbers and one-time codes are never read. While the MCP box is ticked,
+          connected AI apps can read and fill the form in your active tab; it is never submitted for you.
         </p>
       </section>
     </div>
