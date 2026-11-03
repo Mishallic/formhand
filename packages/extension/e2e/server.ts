@@ -15,6 +15,20 @@ export const AI_ANSWERS: Record<string, string> = {
   'Why Northwind?': 'I design calm tools for busy people, and Northwind builds exactly those.',
 };
 
+/** What the fake AI picks out of the test resume (resume-pdf.ts). */
+export const RESUME_ANSWER = {
+  name: 'Jane Doe',
+  details: [
+    { label: 'First name', value: 'Jane' },
+    { label: 'Last name', value: 'Doe' },
+    { label: 'Email', value: 'jane@northwind.test' },
+    { label: 'Phone', value: '+47 912 34 567' },
+    { label: 'City', value: 'Oslo' },
+    { label: 'Country', value: 'Norway' },
+    { label: 'Current job title', value: 'Product designer' },
+  ],
+};
+
 export interface TestServer {
   url: string;
   /** Bodies of the chat completion requests the fake AI received. */
@@ -56,6 +70,11 @@ export async function startServer(): Promise<TestServer> {
       const request = JSON.parse(await body(req)) as TestServer['aiRequests'][number];
       aiRequests.push(request);
       const prompt = request.messages.find((m) => m.role === 'user')?.content ?? '';
+      if (request.messages.find((m) => m.role === 'system')?.content.startsWith("You read a person's resume")) {
+        const content = JSON.stringify(prompt.includes('Jane Doe') ? RESUME_ANSWER : { name: '', details: [] });
+        res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ choices: [{ message: { role: 'assistant', content } }] }));
+        return;
+      }
       const fills = [...prompt.matchAll(/^\{"id":"(f\d+)".*?"label":"([^"]*)"/gm)]
         .filter(([, , label]) => label! in AI_ANSWERS)
         .map(([, id, label]) => ({ id, value: AI_ANSWERS[label!] }));

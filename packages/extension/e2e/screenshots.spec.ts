@@ -36,8 +36,18 @@ test('README screenshots', async ({ openForm, setSettings, serviceWorker }) => {
   try {
     await setSettings({ provider: 'anthropic', providers: { anthropic: { apiKey: 'sk-ant-xxxxxxxxxxxxxxxx' } }, bridge: { enabled: true, pairingCode: code, ports: [17399] } });
     await serviceWorker.evaluate((text) => {
+      const at = '2026-11-03T12:00:00.000Z';
+      const memory = [
+        { question: 'Notice period', value: '3 months', kind: 'text', site: 'jobs.northwind.test', at },
+        { question: 'Are you authorised to work in Norway?', value: 'Yes', kind: 'radio', site: 'careers.fjord.test', at },
+        { question: 'How did you hear about us?', value: 'A friend', kind: 'select', site: 'jobs.northwind.test', at },
+      ];
+      const profiles = [
+        { id: 'p1', name: 'Me', text },
+        { id: 'p2', name: 'Work', text: 'Company: Northwind\nJob title: Product designer' },
+      ];
       // @ts-expect-error chrome is the extension API inside the worker
-      return chrome.storage.local.set({ profiles: [{ id: 'p1', name: 'Me', text }, { id: 'p2', name: 'Work', text: 'Company: Northwind\nJob title: Product designer' }], activeProfile: 'p1', draft: text });
+      return chrome.storage.local.set({ profiles, activeProfile: 'p1', draft: text, memory });
     }, PROFILE);
 
     const { form, panel } = await openForm();
@@ -58,7 +68,7 @@ test('README screenshots', async ({ openForm, setSettings, serviceWorker }) => {
     await panel.getByRole('tab', { name: 'Settings' }).click();
     await panel.screenshot({ path: shot('panel-settings.png'), fullPage: true });
     await panel.getByRole('tab', { name: 'Profiles' }).click();
-    await panel.screenshot({ path: shot('panel-profiles.png') });
+    await panel.screenshot({ path: shot('panel-profiles.png'), fullPage: true });
   } finally {
     await client.close();
   }
