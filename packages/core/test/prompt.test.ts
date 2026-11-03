@@ -41,6 +41,15 @@ describe('prompts', () => {
     expect(msg).toContain('My instructions: Keep it short');
   });
 
+  it('adds earlier answers as data, after the info, only when there are some', () => {
+    const remembered = [{ question: 'Notice period', value: '3 months', kind: 'text' as const, site: 'jobs.acme.test', at: '2026-11-03' }];
+    const msg = buildUserMessage({ snapshot, info: 'Jane', remembered });
+    expect(msg).toContain('Answers I gave on earlier forms:\n<<<\n{"question":"Notice period","answer":"3 months","site":"jobs.acme.test"}\n>>>');
+    expect(msg.indexOf('My information')).toBeLessThan(msg.indexOf('Answers I gave'));
+    expect(buildUserMessage({ snapshot, info: 'Jane', remembered: [] })).not.toContain('earlier forms');
+    expect(SYSTEM_PROMPT).toContain("The user's information wins when the two disagree.");
+  });
+
   it('builds a chat prompt whose reply format the paste box understands', () => {
     const prompt = buildChatPrompt({ snapshot, info: 'Jane' });
     expect(prompt.startsWith(SYSTEM_PROMPT)).toBe(true);

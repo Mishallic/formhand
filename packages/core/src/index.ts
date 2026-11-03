@@ -6,3 +6,4 @@ export * from './parse';
 export * from './match';
 export * from './prompt';
 export * from './protocol';
+export * from './memory';
