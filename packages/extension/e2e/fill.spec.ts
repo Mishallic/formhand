@@ -1,16 +1,5 @@
+import { PASTE, REACT_FILLED, REACT_PASTE } from './data';
 import { expect, test } from './fixtures';
-
-const PASTE = `First name: Jane
-Last name: Doe
-Email: jane@northwind.test
-Phone: +47 912 34 567
-Date of birth: 14/02/1991
-Street address: Storgata 1
-City: Oslo
-Postcode: 0155
-Country: Norway
-Years of experience: 7
-Newsletter: yes`;
 
 test('reads the form, leaving out the password and the hidden trap field', async ({ openForm }) => {
   const { panel } = await openForm();
@@ -53,6 +42,17 @@ test('fills the form from pasted text without AI, and undoes it', async ({ openF
   expect(await form.inputValue('[name=first_name]')).toBe('');
   expect(await form.inputValue('[name=country]')).toBe('');
   expect(await form.getAttribute('[name=first_name]', 'data-formhand-filled')).toBeNull();
+});
+
+test('fills a React form so React sees the new values', async ({ openForm }) => {
+  const { form, panel } = await openForm('/react.html');
+  await expect(panel.getByText('6 fields on 127.0.0.1', { exact: false })).toBeVisible();
+  await panel.locator('#info').fill(REACT_PASTE);
+  await panel.getByRole('button', { name: 'Match fields' }).click();
+  await expect(panel.getByText('6 of 6 fields ready')).toBeVisible();
+  await panel.getByRole('button', { name: 'Fill 6 fields' }).click();
+  await expect(panel.getByText('Filled 6 fields.', { exact: false })).toBeVisible();
+  expect(await form.evaluate(() => (window as { __state?: unknown }).__state)).toEqual(REACT_FILLED);
 });
 
 test('fills the form with an AI provider', async ({ openForm, setSettings, server }) => {

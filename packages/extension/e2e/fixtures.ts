@@ -11,8 +11,8 @@ interface Fixtures {
   context: BrowserContext;
   serviceWorker: Worker;
   extensionId: string;
-  /** Opens the test form, then the side panel page pinned to that form's tab. */
-  openForm: () => Promise<{ form: Page; panel: Page; tabId: number }>;
+  /** Opens the test form (or another test page), then the side panel page pinned to that tab. */
+  openForm: (path?: string) => Promise<{ form: Page; panel: Page; tabId: number }>;
   /** Writes extension settings straight into storage, as the Settings tab would. */
   setSettings: (settings: unknown) => Promise<void>;
 }
@@ -53,9 +53,9 @@ export const test = base.extend<Fixtures, { server: TestServer }>({
   },
 
   openForm: async ({ context, server, serviceWorker, extensionId }, use) => {
-    await use(async () => {
+    await use(async (path = '/apply.html') => {
       const form = await context.newPage();
-      await form.goto(`${server.url}/apply.html`);
+      await form.goto(`${server.url}${path}`);
       const tabId = (await serviceWorker.evaluate(
         async (url: string) => (await chrome.tabs.query({})).find((t: { url?: string }) => t.url === url)?.id,
         form.url(),

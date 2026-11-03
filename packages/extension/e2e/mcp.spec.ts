@@ -4,11 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { PAIRING_CODE as CODE } from './data';
 import { expect, test } from './fixtures';
 
 // Built by `npm run build -w @formhand/mcp`.
 const HELPER = join(import.meta.dirname, '..', '..', 'mcp', 'dist', 'formhand-mcp.js');
-const CODE = 'E2ETS-TCDEF-GHJKM-NPQRS';
 
 async function freePort(): Promise<number> {
   const server = createServer();
