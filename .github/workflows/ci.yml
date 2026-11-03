@@ -26,8 +26,13 @@ jobs:
       - name: Install Chromium for end-to-end tests
         working-directory: packages/extension
         run: npx playwright install --with-deps --no-shell chromium
-      - name: End-to-end tests
+      - name: End-to-end tests in Chromium
         run: npm run test:e2e -w @formhand/extension
+      # The runner image ships Firefox and geckodriver.
+      - name: End-to-end tests in Firefox
+        run: |
+          firefox --version && geckodriver --version | head -1
+          npm run test:e2e:firefox -w @formhand/extension
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
