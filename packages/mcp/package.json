@@ -1,0 +1,24 @@
+{
+  "name": "@formhand/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local MCP server that lets AI apps (Claude Desktop, Claude Code, Cursor, ...) read and fill forms through the Formhand extension.",
+  "type": "module",
+  "bin": {
+    "formhand-mcp": "dist/formhand-mcp.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "ws": "^8.22.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/ws": "^8.18.2",
+    "tsup": "^9.0.0"
+  }
+}

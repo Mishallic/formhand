@@ -1,0 +1,13 @@
+{
+  "name": "@formhand/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Form schema, paste parsing, field matching and AI prompt logic shared by the Formhand extension and MCP helper.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

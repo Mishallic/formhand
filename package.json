@@ -1,0 +1,30 @@
+{
+  "name": "formhand",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser extension that fills web forms from pasted text, an AI provider, or your AI app over MCP.",
+  "type": "module",
+  "workspaces": [
+    "packages/core",
+    "packages/mcp",
+    "packages/extension"
+  ],
+  "scripts": {
+    "build": "npm run build -w @formhand/mcp && npm run build -w @formhand/extension",
+    "build:all": "npm run build -w @formhand/mcp && npm run build:all -w @formhand/extension",
+    "zip": "npm run zip -w @formhand/extension",
+    "dev": "npm run dev -w @formhand/extension",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "npm run test:e2e -w @formhand/extension",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "mcp:setup": "node packages/mcp/dist/formhand-mcp.js setup"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
