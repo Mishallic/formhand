@@ -81,12 +81,14 @@ describe('matchPairs', () => {
   it('splits a full name over first and last name fields', () => {
     const proposals = matchPairs(pairsOf('Name: Mary Ann Smith'), signup);
     expect(byField(proposals)).toEqual({ f1: 'Mary Ann', f2: 'Smith' });
-    expect(proposals[0]!.source).toBe('first name (from full name)');
+    expect(proposals.map((p) => p.source)).toEqual(['Name', 'Name']);
   });
 
   it('joins first and last name for a single name field', () => {
     const fields: FormField[] = [{ id: 'f1', kind: 'text', label: 'Full name' }];
-    expect(byField(matchPairs(pairsOf('first_name: Jane\nlast_name: Doe'), fields))).toEqual({ f1: 'Jane Doe' });
+    const proposals = matchPairs(pairsOf('first_name: Jane\nlast_name: Doe'), fields);
+    expect(byField(proposals)).toEqual({ f1: 'Jane Doe' });
+    expect(proposals[0]!.source).toBe('first_name + last_name');
   });
 
   it('does not put a person name into "Company name"', () => {

@@ -94,14 +94,14 @@ function derivePairs(pairs: Pair[]): Pair[] {
   if (full && !byConcept.has('given-name') && !byConcept.has('family-name')) {
     const parts = full.value.trim().split(/\s+/);
     if (parts.length >= 2) {
-      derived.push({ key: 'first name', value: parts.slice(0, -1).join(' '), derived: true });
-      derived.push({ key: 'last name', value: parts[parts.length - 1]!, derived: true });
+      derived.push({ key: 'first name', value: parts.slice(0, -1).join(' '), derived: true, origin: full.key });
+      derived.push({ key: 'last name', value: parts[parts.length - 1]!, derived: true, origin: full.key });
     }
   }
   const given = byConcept.get('given-name');
   const family = byConcept.get('family-name');
   if (given && family && !full) {
-    derived.push({ key: 'full name', value: `${given.value} ${family.value}`.trim(), derived: true });
+    derived.push({ key: 'full name', value: `${given.value} ${family.value}`.trim(), derived: true, origin: `${given.key} + ${family.key}` });
   }
   return [...pairs, ...derived];
 }
@@ -173,7 +173,7 @@ export function matchPairs(pairs: Pair[], fields: FormField[], options: MatchOpt
     proposals.push({
       fieldId: p.field.id,
       value,
-      source: pair.derived ? `${pair.key} (from full name)` : pair.key,
+      source: pair.origin ?? pair.key,
       confidence: Math.min(1, Math.round(hit.s * 100) / 100),
     });
   });

@@ -66,6 +66,8 @@ export interface Pair {
   value: string;
   /** Set on pairs Formhand made itself, such as a first name split from a full name. */
   derived?: boolean;
+  /** For derived pairs, the key(s) they came from, shown to the user ("Name"). */
+  origin?: string;
 }
 
 /** A proposed value for one field, shown to the user before anything is filled. */
