@@ -6,9 +6,9 @@ import { isPageRequest, type PageRequest, type Reply } from '../lib/messages';
 function handle(page: PageController, message: PageRequest): unknown {
   switch (message.type) {
     case 'formhand:scan':
-      return page.scan();
+      return page.scan(message.secrets === true);
     case 'formhand:fill':
-      return page.fill(message.fills);
+      return page.fill(message.fills, message.secrets === true);
     case 'formhand:undo':
       return { restored: page.undo() };
   }

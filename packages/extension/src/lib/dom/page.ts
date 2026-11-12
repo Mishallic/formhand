@@ -23,14 +23,15 @@ export class PageController {
     private readonly options: ScanOptions & { locale?: string } = {},
   ) {}
 
-  scan(): FormSnapshot {
-    this.last = scanDocument(this.doc, this.ids, this.options);
+  /** `secrets` is the test-data seeder's mode: password boxes are listed too (never their values). */
+  scan(secrets = false): FormSnapshot {
+    this.last = scanDocument(this.doc, this.ids, { ...this.options, secrets });
     return this.last.snapshot;
   }
 
-  fill(fills: Fill[]): FillResult {
+  fill(fills: Fill[], secrets = false): FillResult {
     // Fields can appear after the first scan (a "Company" box shown after a checkbox), so rescan for unknown ids.
-    if (!this.last || fills.some((f) => !this.last!.targets.has(f.id))) this.scan();
+    if (!this.last || fills.some((f) => !this.last!.targets.has(f.id))) this.scan(secrets);
     const { snapshot, targets } = this.last!;
     const fieldsById = new Map(snapshot.fields.map((f) => [f.id, f]));
     const result: FillResult = { filled: [], skipped: [] };
@@ -42,6 +43,11 @@ export class PageController {
       const target = targets.get(fill.id);
       if (!field || !target) {
         result.skipped.push({ id: fill.id, reason: 'no field with this id; read the form again' });
+        continue;
+      }
+      // An id from an earlier seeder scan must not let a normal fill or an AI app write a password.
+      if (field.kind === 'password' && !secrets) {
+        result.skipped.push({ id: fill.id, reason: 'Formhand only fills passwords from its test-data seeder' });
         continue;
       }
       try {

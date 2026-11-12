@@ -1,7 +1,14 @@
 import type { BridgeMethod, Fill, FillResult, FormSnapshot } from '@formhand/core';
 
-/** Requests the side panel and the background send to the content script in a tab. */
-export type PageRequest = { type: 'formhand:scan' } | { type: 'formhand:fill'; fills: Fill[] } | { type: 'formhand:undo' };
+/**
+ * Requests the side panel and the background send to the content script in a tab.
+ * `secrets` is set only by the panel's test-data seeder: the scan then lists password
+ * boxes (never their values) and the fill may write them.
+ */
+export type PageRequest =
+  | { type: 'formhand:scan'; secrets?: boolean }
+  | { type: 'formhand:fill'; fills: Fill[]; secrets?: boolean }
+  | { type: 'formhand:undo' };
 
 export interface PageResults {
   'formhand:scan': FormSnapshot;

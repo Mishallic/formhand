@@ -11,11 +11,20 @@ export interface ScanOptions {
    * detection). Needs real layout, so tests on jsdom turn it off.
    */
   checkLayout?: boolean;
+  /**
+   * Also list password boxes, as kind "password" and without their values. Only the
+   * test-data seeder asks for this; ordinary scans and AI apps never see them.
+   */
+  secrets?: boolean;
 }
 
 const SKIP_TYPES = new Set(['hidden', 'password', 'submit', 'button', 'reset', 'image', 'file', 'range', 'color']);
-const SENSITIVE_AUTOCOMPLETE = /\b(cc-\w+|current-password|new-password|one-time-code)\b/i;
-const SENSITIVE_NAME = /card.?num|cc.?num|credit.?card|cvv|cvc|csc|security.?code|card.?code|one.?time|otp\b|passw/i;
+/** Payment cards and one-time codes: never listed, in any mode. */
+const CARD_OR_CODE_AUTOCOMPLETE = /\b(cc-\w+|one-time-code)\b/i;
+const CARD_OR_CODE_NAME = /card.?num|cc.?num|credit.?card|cvv|cvc|csc|security.?code|card.?code|one.?time|otp\b/i;
+/** Passwords: listed only for the seeder, which fills them and never reads them. */
+const PASSWORD_AUTOCOMPLETE = /\b(current-password|new-password)\b/i;
+const PASSWORD_NAME = /passw/i;
 
 const INPUT_KINDS: Record<string, FieldKind> = {
   text: 'text',
@@ -132,11 +141,16 @@ function sectionOf(el: Element): string | undefined {
   return last ? clean(textOf(last), 80) || undefined : undefined;
 }
 
-function isSensitive(el: Control): boolean {
-  if (el instanceof HTMLInputElement && el.type === 'password') return true;
+function isPassword(el: Control): boolean {
+  return el instanceof HTMLInputElement && el.type === 'password';
+}
+
+function isSensitive(el: Control, secrets: boolean): boolean {
   const ac = el.getAttribute('autocomplete') ?? '';
-  if (SENSITIVE_AUTOCOMPLETE.test(ac)) return true;
-  return SENSITIVE_NAME.test(`${el.name} ${el.id}`);
+  const names = `${el.name} ${el.id}`;
+  if (CARD_OR_CODE_AUTOCOMPLETE.test(ac) || CARD_OR_CODE_NAME.test(names)) return true;
+  if (secrets) return false;
+  return isPassword(el) || PASSWORD_AUTOCOMPLETE.test(ac) || PASSWORD_NAME.test(names);
 }
 
 function isVisible(el: Control, checkLayout: boolean): boolean {
@@ -157,8 +171,9 @@ function isVisible(el: Control, checkLayout: boolean): boolean {
   return true;
 }
 
-function kindOf(el: Control): FieldKind | undefined {
+function kindOf(el: Control, secrets = false): FieldKind | undefined {
   if (el instanceof HTMLTextAreaElement) return 'textarea';
+  if (secrets && isPassword(el)) return 'password';
   if (el instanceof HTMLSelectElement) return el.multiple ? undefined : 'select';
   if (SKIP_TYPES.has(el.type)) return undefined;
   return INPUT_KINDS[el.type] ?? 'text';
@@ -232,12 +247,13 @@ export interface ScanResult {
 
 export function scanDocument(doc: Document, ids: FieldIds, options: ScanOptions = {}): ScanResult {
   const checkLayout = options.checkLayout ?? true;
+  const secrets = options.secrets ?? false;
   const fields: FormField[] = [];
   const targets = new Map<string, FieldTarget>();
   const radioGroups = new Map<string, HTMLInputElement[]>();
 
   const controls = collectControls(doc).filter(
-    (el) => !el.disabled && !(el as HTMLInputElement).readOnly && !isSensitive(el) && kindOf(el) && isVisible(el, checkLayout),
+    (el) => !el.disabled && !(el as HTMLInputElement).readOnly && !isSensitive(el, secrets) && kindOf(el, secrets) && isVisible(el, checkLayout),
   );
 
   controls.forEach((el, i) => {
@@ -255,7 +271,7 @@ export function scanDocument(doc: Document, ids: FieldIds, options: ScanOptions 
       targets.set(id, { type: 'radio', els: radioGroups.get(key)! });
       return;
     }
-    const kind = kindOf(el)!;
+    const kind = kindOf(el, secrets)!;
     const id = ids.idFor(el);
     const field: FormField = { id, kind, label: labelOf(el) };
     if (el.name) field.name = el.name;
@@ -274,7 +290,8 @@ export function scanDocument(doc: Document, ids: FieldIds, options: ScanOptions 
       if (selected && selected.value !== '') field.value = clean(selected.label || selected.text, 120);
     } else if (el instanceof HTMLInputElement && el.type === 'checkbox') {
       field.value = String(el.checked);
-    } else if (el.value) {
+    } else if (el.value && kind !== 'password') {
+      // A password box is listed so the seeder can fill it; what is in it is never read.
       field.value = el.value.length > 500 ? `${el.value.slice(0, 500)}…` : el.value;
     }
     fields.push(field);

@@ -204,3 +204,43 @@ describe('React-controlled forms', () => {
     act(() => root.unmount());
   });
 });
+
+describe('passwords', () => {
+  const SIGNUP = `
+    <label>Username <input name="username"></label>
+    <label>Password <input type="password" name="password"></label>
+    <label>Confirm password <input type="password" name="confirm"></label>`;
+
+  it('are filled by the seeder, and put back by undo', () => {
+    const page = controller(SIGNUP);
+    const ids = page.scan(true).fields.map((f) => f.id);
+    expect(ids).toHaveLength(3);
+    const result = page.fill(
+      [
+        { id: ids[0]!, value: 'maraberg7k2f' },
+        { id: ids[1]!, value: 'c5DPbb5wDrxXHQw' },
+        { id: ids[2]!, value: 'c5DPbb5wDrxXHQw' },
+      ],
+      true,
+    );
+    expect(result.filled).toEqual(ids);
+    expect(q<HTMLInputElement>('[name=password]').value).toBe('c5DPbb5wDrxXHQw');
+    expect(q<HTMLInputElement>('[name=confirm]').value).toBe('c5DPbb5wDrxXHQw');
+    expect(page.undo()).toBe(3);
+    expect(q<HTMLInputElement>('[name=password]').value).toBe('');
+  });
+
+  it('are refused in an ordinary fill, even with an id from a seeder scan', () => {
+    const page = controller(SIGNUP);
+    const [, passwordId] = page.scan(true).fields.map((f) => f.id);
+    // What a normal fill or an AI app over MCP sends: no seeder flag.
+    const result = page.fill([{ id: passwordId!, value: 'guess' }]);
+    expect(result.filled).toEqual([]);
+    expect(result.skipped).toEqual([{ id: passwordId, reason: 'Formhand only fills passwords from its test-data seeder' }]);
+    expect(q<HTMLInputElement>('[name=password]').value).toBe('');
+
+    // And after an ordinary scan the id is not known at all.
+    page.scan();
+    expect(page.fill([{ id: passwordId!, value: 'guess' }]).skipped[0]!.reason).toBe('no field with this id; read the form again');
+  });
+});

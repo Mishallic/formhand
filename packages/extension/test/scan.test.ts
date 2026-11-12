@@ -146,3 +146,28 @@ describe('scanDocument: controls', () => {
     expect(snapshot.url).toMatch(/^http/);
   });
 });
+
+describe('scanDocument: the seeder\'s mode', () => {
+  const SIGNUP = `
+    <label>Username <input name="username" autocomplete="username"></label>
+    <label>Password <input type="password" name="password" autocomplete="new-password" value="hunter2"></label>
+    <label>Confirm password <input type="password" name="password_confirm"></label>
+    <label>Card number <input name="card_number" autocomplete="cc-number"></label>
+    <label>Code <input name="otp" autocomplete="one-time-code"></label>`;
+
+  it('lists password boxes as kind "password", without what is in them', () => {
+    document.body.innerHTML = SIGNUP;
+    const { snapshot } = scanDocument(document, new FieldIds(), { checkLayout: false, secrets: true });
+    expect(snapshot.fields.map((f) => [f.label, f.kind])).toEqual([
+      ['Username', 'text'],
+      ['Password', 'password'],
+      ['Confirm password', 'password'],
+    ]);
+    expect(snapshot.fields[1]!.value).toBeUndefined();
+    expect(JSON.stringify(snapshot)).not.toContain('hunter2');
+  });
+
+  it('still leaves them out of every ordinary scan', () => {
+    expect(fields(SIGNUP).map((f) => f.label)).toEqual(['Username']);
+  });
+});
