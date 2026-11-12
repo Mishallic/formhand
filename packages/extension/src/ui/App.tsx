@@ -5,9 +5,10 @@ import { FillView } from './FillView';
 import { useBridge, usePage, useSettings } from './hooks';
 import { Mark, RefreshIcon } from './icons';
 import { ProfilesView } from './ProfilesView';
+import { SeedView } from './SeedView';
 import { SettingsView } from './SettingsView';
 
-type Tab = 'fill' | 'profiles' | 'settings';
+type Tab = 'fill' | 'seed' | 'profiles' | 'settings';
 
 function host(url: string): string {
   try {
@@ -83,9 +84,9 @@ export function App() {
           </button>
         </div>
         <nav className="tabs" role="tablist">
-          {(['fill', 'profiles', 'settings'] as const).map((t) => (
+          {(['fill', 'seed', 'profiles', 'settings'] as const).map((t) => (
             <button key={t} type="button" role="tab" className="tab" aria-selected={tab === t} onClick={() => setTab(t)}>
-              {t === 'fill' ? 'Fill' : t === 'profiles' ? 'Profiles' : 'Settings'}
+              {t === 'fill' ? 'Fill' : t === 'seed' ? 'Seed' : t === 'profiles' ? 'Profiles' : 'Settings'}
             </button>
           ))}
         </nav>
@@ -106,6 +107,9 @@ export function App() {
               goToSettings={() => setTab('settings')}
               memory={memory}
             />
+          </main>
+          <main className="panel" hidden={tab !== 'seed'}>
+            <SeedView tabId={page.tabId} pageUrl={page.snapshot?.url} />
           </main>
           <main className="panel" hidden={tab !== 'profiles'}>
             <ProfilesView

@@ -1,4 +1,4 @@
-import type { RememberedAnswer } from '@formhand/core';
+import type { RememberedAnswer, SeedEntry } from '@formhand/core';
 import { browser } from 'wxt/browser';
 import { PROVIDERS, type ProviderId } from './ai/providers';
 
@@ -31,7 +31,7 @@ export const DEFAULT_SETTINGS: Settings = {
   memory: { enabled: true },
 };
 
-const KEYS = { settings: 'settings', profiles: 'profiles', activeProfile: 'activeProfile', draft: 'draft', memory: 'memory' } as const;
+const KEYS = { settings: 'settings', profiles: 'profiles', activeProfile: 'activeProfile', draft: 'draft', memory: 'memory', seeds: 'seeds' } as const;
 
 export async function loadSettings(): Promise<Settings> {
   const stored = (await browser.storage.local.get(KEYS.settings))[KEYS.settings] as Partial<Settings> | undefined;
@@ -113,4 +113,21 @@ export function onSettingsChanged(listener: (settings: Settings) => void): () =>
   };
   browser.storage.onChanged.addListener(handler);
   return () => browser.storage.onChanged.removeListener(handler);
+}
+
+/** A seed entry that was filled into a page, kept so the test account can be used again. */
+export interface SeedRecord extends SeedEntry {
+  site: string;
+  at: string;
+}
+
+export const SEED_HISTORY_LIMIT = 30;
+
+/** Seed entries filled so far, newest first. */
+export async function loadSeeds(): Promise<SeedRecord[]> {
+  return ((await browser.storage.local.get(KEYS.seeds))[KEYS.seeds] as SeedRecord[] | undefined) ?? [];
+}
+
+export async function saveSeeds(seeds: SeedRecord[]): Promise<void> {
+  await browser.storage.local.set({ [KEYS.seeds]: seeds.slice(0, SEED_HISTORY_LIMIT) });
 }
