@@ -69,6 +69,12 @@ test('README screenshots', async ({ openForm, setSettings, serviceWorker }) => {
     await panel.screenshot({ path: shot('panel-settings.png'), fullPage: true });
     await panel.getByRole('tab', { name: 'Profiles' }).click();
     await panel.screenshot({ path: shot('panel-profiles.png'), fullPage: true });
+
+    const signup = await openForm('/signup.html');
+    await signup.panel.getByRole('tab', { name: 'Seed' }).click();
+    await signup.panel.getByRole('button', { name: 'Fill', exact: true }).click();
+    await expect(signup.panel.getByText('Filled 5 fields')).toBeVisible();
+    await signup.panel.screenshot({ path: shot('panel-seed.png'), fullPage: true });
   } finally {
     await client.close();
   }

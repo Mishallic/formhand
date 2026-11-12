@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create your Northwind account</title>
+    <style>
+      body { font: 15px/1.5 system-ui, sans-serif; margin: 0; background: #f3f4f7; color: #1d2330; }
+      main { max-width: 440px; margin: 32px auto; background: #fff; padding: 28px 32px; border-radius: 8px; border: 1px solid #dde1e8; }
+      h1 { font-size: 22px; margin: 0 0 16px; }
+      label { display: block; margin: 12px 0 4px; font-weight: 600; }
+      input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #c3c9d4; border-radius: 6px; font: inherit; }
+      button { margin-top: 20px; padding: 10px 16px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Create your account</h1>
+      <form id="signup">
+        <label for="first">First name</label>
+        <input id="first" name="first_name" autocomplete="given-name" />
+        <label for="last">Last name</label>
+        <input id="last" name="last_name" autocomplete="family-name" />
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" />
+        <label for="user">Username</label>
+        <input id="user" name="username" />
+        <label for="pw">Password</label>
+        <input id="pw" name="password" type="password" autocomplete="new-password" />
+        <label for="pw2">Confirm password</label>
+        <input id="pw2" name="password_confirm" type="password" autocomplete="new-password" />
+        <label for="card">Card number</label>
+        <input id="card" name="card_number" autocomplete="cc-number" />
+        <button type="submit">Create account</button>
+      </form>
+    </main>
+    <script>
+      document.getElementById('signup').addEventListener('submit', (e) => {
+        e.preventDefault();
+        window.__submitted = true;
+      });
+    </script>
+  </body>
+</html>
