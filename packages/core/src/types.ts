@@ -13,7 +13,9 @@ export type FieldKind =
   | 'textarea'
   | 'select'
   | 'checkbox'
-  | 'radio';
+  | 'radio'
+  /** Only in the test-data seeder's scans; ordinary scans never list password boxes. */
+  | 'password';
 
 export interface FieldOption {
   value: string;
