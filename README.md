@@ -14,11 +14,13 @@ A browser extension that fills in web forms for you, from text you paste, from t
 - **Chat app, no key.** Copies a ready-made prompt for ChatGPT, Claude or Gemini on the web. You paste the reply back and Formhand reads it.
 - **Your AI app over MCP.** Claude Desktop, Claude Code, Cursor, VS Code and other MCP apps get three tools: `get_form`, `fill_form` and `undo_fill`. You say "fill the form in my browser with my details from cv.pdf" in the app, and the form in your active tab fills in, on that app's subscription with no API key.
 - **You stay in charge.** Every route except MCP shows a preview first, laid out like a filled-in paper form. You can edit any value or untick it. Filled fields are outlined on the page, and each fill can be undone. Formhand never submits a form.
-- **Some fields are never read:** passwords, card numbers, CVCs, one-time codes, and invisible "honeypot" fields that sites use to catch bots.
+- **Some fields are never read:** passwords, card numbers, CVCs, one-time codes, and invisible "honeypot" fields that sites use to catch bots. The one exception is the Seed tab, which can write a made-up password into a password box. It never reads what is in one, and no other route, AI apps included, can see or fill them.
 - **Profiles from your resume.** Pick a PDF, Word (.docx) or text resume. Formhand reads it in the browser, and your AI provider picks out your name, contact details, links and current job once. The profile keeps those as `Label: value` lines, which Match fields can use without AI, followed by the whole resume, so Fill with AI can answer open questions from it. Claude can also read a scanned PDF. You can still write profiles by hand ("Me", "Work").
 - **Remembers your answers.** After a fill, the answers your info didn't already have are kept and used on later forms, by Match fields and by the AI. Examples are a value you typed into the preview, or a notice period the AI worked out. Your info wins when the two differ, consent boxes are never kept, and undoing a fill takes its answers back out. You can see, forget or switch this off on the Profiles tab.
+- **Seeds test accounts.** The Seed tab makes up a new test account for every fill, for testing sign-up forms: a unique username, a strong 15-character password such as `c5DPbb5wDrxXHQw`, a first name and a last name. **Detect** shows which fields on the page take a part of it. **Fill** puts one entry into all of them, so "Confirm password" gets the same password, then readies a different entry for the next fill. Used entries are kept under Recent entries with copy buttons, so you can sign in with them later. No AI or key is involved.
 
 <p>
+  <img src="docs/panel-seed.png" width="280" alt="The Seed tab after a fill: five detected fields, the next entry with its username and password, and the entry just used under Recent entries" />
   <img src="docs/panel-settings.png" width="280" alt="Settings: AI provider, model and key, the MCP pairing code with 'Connected to Claude Desktop', and what leaves your computer" />
   <img src="docs/panel-match-dark.png" width="280" alt="The match preview in dark mode" />
 </p>
@@ -43,8 +45,9 @@ A browser extension that fills in web forms for you, from text you paste, from t
    - **Reading a resume:** PDFs are read with Mozilla's pdf.js, loaded only when you pick one, and Word files by unzipping `word/document.xml`. The text goes to your provider once, with its own prompt and JSON schema, to pick out the facts forms ask for. A PDF with no text layer goes to Claude as the file itself; other providers can't read scans.
    - **What is remembered:** only answers that didn't come straight from your info: values you edited in the preview, AI and chat-app answers, and remembered answers used again (their date is refreshed). Long answers over 500 characters (cover letters) and consent boxes are skipped. A newer answer to the same question replaces the older one, and at most 200 are kept.
    - **How they are used:** Match fields uses remembered answers only for fields your info left empty. The AI gets them as a separate block after your info, marked as earlier answers that your info overrides, and as data from other websites.
-5. **Filling** ([fill.ts](packages/extension/src/lib/dom/fill.ts)). Values are set through the element prototype's native setter, followed by `input` and `change` events. That is what makes React, Vue and similar libraries register the change. A unit test fills a real React form and checks its state, and the end-to-end tests do the same in Chromium and Firefox. Checkboxes and radios are clicked. If the browser rejects a value, as with "lots" in a number field, the old value goes back and the reason is reported.
-6. **The MCP bridge** ([bridge.ts](packages/mcp/src/bridge.ts), [bridge-client.ts](packages/extension/src/lib/bridge-client.ts)). Your AI app starts `formhand-mcp` as a stdio MCP server. The helper also listens on `127.0.0.1`, using the first free port from 17345 to 17349, so several AI apps can run at once. The extension's background script connects to every helper it finds.
+5. **Seeding test accounts** ([seed.ts](packages/core/src/seed.ts)). Entries come from the browser's cryptographic random generator. The username is the name in small letters plus four random letters or digits, letters and digits only so most sites accept it, and never one handed out before. Fields are found by autocomplete hint, label, name, id and placeholder. The Seed tab scans the page in its own mode, which also lists password boxes but never their values; an ordinary scan leaves them out, and an ordinary fill refuses a password box even when given its id.
+6. **Filling** ([fill.ts](packages/extension/src/lib/dom/fill.ts)). Values are set through the element prototype's native setter, followed by `input` and `change` events. That is what makes React, Vue and similar libraries register the change. A unit test fills a real React form and checks its state, and the end-to-end tests do the same in Chromium and Firefox. Checkboxes and radios are clicked. If the browser rejects a value, as with "lots" in a number field, the old value goes back and the reason is reported.
+7. **The MCP bridge** ([bridge.ts](packages/mcp/src/bridge.ts), [bridge-client.ts](packages/extension/src/lib/bridge-client.ts)). Your AI app starts `formhand-mcp` as a stdio MCP server. The helper also listens on `127.0.0.1`, using the first free port from 17345 to 17349, so several AI apps can run at once. The extension's background script connects to every helper it finds.
    - **Security:** web pages are refused at the handshake by their Origin header, and the first message must carry the pairing code, which is compared in constant time.
    - **Keeping Chrome awake:** pings keep Chrome's service worker alive while a helper is connected, and an alarm looks for new helpers every 30 seconds.
    - **More than one browser:** requests go to the browser you focused last.
@@ -73,7 +76,7 @@ Values are always strings. Selects and radios take an option label ("Norway"; al
 
 Formhand has no server, no account and no telemetry.
 
-- **Stays in your browser:** profiles, pasted text, remembered answers and API keys, in the extension's local storage.
+- **Stays in your browser:** profiles, pasted text, remembered answers, seed entries and API keys, in the extension's local storage.
 - **Fill with AI:** sends the page's field descriptions, your info and your remembered answers to the provider you picked, and nothing else.
 - **Resumes:** read in the browser. The text is sent once to your provider to pick out your details; a scanned PDF is sent as the file, to Claude only. The file itself isn't kept.
 - **MCP:** the helper only listens on `127.0.0.1` and only talks to the paired extension.
@@ -82,9 +85,9 @@ Formhand has no server, no account and no telemetry.
 ## Tests
 
 ```
-npm test                  # 161 unit tests: core 78, mcp 28, extension 55
-npm run test:e2e          # builds, then 12 Playwright tests against the real extension in Chromium
-npm run test:e2e:firefox  # builds for Firefox, then 14 tests in your installed Firefox
+npm test                  # 174 unit tests: core 87, mcp 28, extension 59
+npm run test:e2e          # builds, then 14 Playwright tests against the real extension in Chromium
+npm run test:e2e:firefox  # builds for Firefox, then 16 tests in your installed Firefox
 npm run typecheck
 ```
 
@@ -112,8 +115,10 @@ npm run typecheck
   - a second copy of the content script injected into an open tab, which must take over without filling twice;
   - a PDF resume read by pdf.js and turned into a profile that fills the form;
   - an answer typed into the preview, filled again on a fresh copy of the form from memory, then forgotten;
-  - undoing a fill, which takes its answers back out.
-- **End to end in Firefox** ([e2e/firefox/](packages/extension/e2e/firefox)): Playwright can't load Firefox extensions, so these tests drive a real Firefox through geckodriver (Selenium), with Playwright only as the test runner. They run the same journeys, including the resume and remembered answers, because Firefox differs where it matters: content scripts see the page through Xray wrappers, the background is a Manifest V2 page, and the clipboard and WebSocket paths are its own. The chat test pastes what Firefox really put on the clipboard. Two more tests click Formhand's button in the toolbar's Extensions menu to open and close the sidebar, and check the Alt+Shift+F shortcut. The panel is opened as a tab so the tests can read it; set `HEADED=1` to watch, or `FIREFOX_BIN` to pick a Firefox.
+  - undoing a fill, which takes its answers back out;
+  - the Seed tab on a sign-up page: Detect finds five fields and changes nothing, Fill writes one entry into all of them (both password boxes alike, the card box untouched), and the next fill is a different entry;
+  - the Fill tab on the same page, which still lists no password box.
+- **End to end in Firefox** ([e2e/firefox/](packages/extension/e2e/firefox)): Playwright can't load Firefox extensions, so these tests drive a real Firefox through geckodriver (Selenium), with Playwright only as the test runner. They run the same journeys, including the resume, remembered answers and the seeder, because Firefox differs where it matters: content scripts see the page through Xray wrappers, the background is a Manifest V2 page, and the clipboard and WebSocket paths are its own. The chat test pastes what Firefox really put on the clipboard. Two more tests click Formhand's button in the toolbar's Extensions menu to open and close the sidebar, and check the Alt+Shift+F shortcut. The panel is opened as a tab so the tests can read it; set `HEADED=1` to watch, or `FIREFOX_BIN` to pick a Firefox.
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the type check, the unit tests, builds for all three browsers, Mozilla's `web-ext lint` and the end-to-end tests in Chromium and Firefox.
 
@@ -125,6 +130,7 @@ CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the type check, t
 - **Resumes:** old `.doc` files aren't read (save as .docx or PDF), only the first 20 pages of a PDF are, and scanned PDFs need Claude. Picking out details needs an AI provider; without one, the profile is the resume's text.
 - **Remembered answers stay in one browser.** They aren't synced, and an answer to "the same question" is matched by its wording, so differently worded questions are only connected by the AI.
 - **ChatGPT can't use the MCP route.** ChatGPT only connects to remote MCP servers, so it can't reach the local helper. Use the chat-app route or an OpenAI key instead.
+- **Seed entries are test data.** Their passwords are kept unencrypted in the extension's local storage, 30 at most, so use them for test accounts only. The names are made up from a fixed list, and only username, password, first name and last name fields are filled; email and the rest are left to you.
 - **API keys are stored unencrypted** in the extension's local storage, as with most extensions. Anyone with access to your browser profile could read them.
 - **Firefox keeps Formhand only until it restarts**, until the add-on is signed by Mozilla (listed on addons.mozilla.org or signed for self-distribution). `web-ext lint` reports no errors and four warnings: `innerHTML` inside React DOM's own code, and pdf.js loading its worker with `import()`.
 - **Ambiguous dates** like 03/04/1990 follow your browser's language: month first only for en-US.
